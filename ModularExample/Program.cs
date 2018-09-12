@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Infrastructure;
 using TableDependency.SqlClient;
 using TableDependency.SqlClient.Base;
+using TableDependency.SqlClient.Base.Abstracts;
 using TableDependency.SqlClient.Base.EventArgs;
 using WebWhatsappAPI;
 
@@ -24,16 +25,19 @@ namespace WhatsApiLauncher
 
             //Expression<Func<OutgoingMessage, bool>> filterExpression = p => p.sent == null;
             //_dependency = new SqlTableDependency<Infrastructure.OutgoingMessage>(_connectionString, filter: filterExpression);
-
+            ITableDependencyFilter filterExpression = new CustomSqlTableDependencyFilter(0);
 
             var updateOfModel = new UpdateOfModel<OutgoingMessage>();
             updateOfModel.Add(i => i.sent);
-            _dependency = new SqlTableDependency<OutgoingMessage>(_connectionString, notifyOn:TableDependency.SqlClient.Base.Enums.DmlTriggerType.Insert);
+            _dependency = new SqlTableDependency<OutgoingMessage>(_connectionString, filter: filterExpression);
 
 
             _dependency.OnChanged += _dependency_OnChanged;
             _dependency.OnError += _dependency_OnError;
-            _dependency.Start();
+          
+              _dependency.Start();
+           
+            
         }
 
         private void UnhandledExceptionTrapper(object sender, UnhandledExceptionEventArgs e)

@@ -51,6 +51,8 @@ namespace WhatsappWebMSI.Controllers
                 message.created_date = DateTime.Now;
                 message.userid = userid;
                 message.divison = division;
+                message.sent = false;
+
 
                 _context.OutgoingMessages.Add(message);
                 var res = await _context.SaveChangesAsync();
