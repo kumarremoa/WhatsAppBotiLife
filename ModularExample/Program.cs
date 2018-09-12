@@ -1,36 +1,36 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
-using System.Linq;
-using System.Net;
-using System.Text;
+using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Web.Script.Serialization;
 using Infrastructure;
-using TableDependency;
-using TableDependency.EventArgs;
 using TableDependency.SqlClient;
+using TableDependency.SqlClient.Base;
+using TableDependency.SqlClient.Base.EventArgs;
 using WebWhatsappAPI;
 
 namespace WhatsApiLauncher
 {
     class Program
     {
-        private  readonly SqlTableDependency<Infrastructure.OutgoingMessage> _dependency;
+        private  readonly SqlTableDependency<OutgoingMessage> _dependency;
         private readonly string _connectionString = ConfigurationManager.ConnectionStrings["WAModel"].ConnectionString;
         //private static readonly object Locker = new object();
         private static TimeSpan tick;
         public Program()
         {
             System.AppDomain.CurrentDomain.UnhandledException += UnhandledExceptionTrapper;
-           
+
+            //Expression<Func<OutgoingMessage, bool>> filterExpression = p => p.sent == null;
+            //_dependency = new SqlTableDependency<Infrastructure.OutgoingMessage>(_connectionString, filter: filterExpression);
+
 
             var updateOfModel = new UpdateOfModel<OutgoingMessage>();
             updateOfModel.Add(i => i.sent);
+            _dependency = new SqlTableDependency<OutgoingMessage>(_connectionString, notifyOn:TableDependency.SqlClient.Base.Enums.DmlTriggerType.Insert);
 
-            _dependency = new SqlTableDependency<Infrastructure.OutgoingMessage>(_connectionString,updateOf:updateOfModel);
+
             _dependency.OnChanged += _dependency_OnChanged;
             _dependency.OnError += _dependency_OnError;
             _dependency.Start();

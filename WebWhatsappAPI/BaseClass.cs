@@ -330,7 +330,7 @@ namespace WebWhatsappAPI
             //Scan Outgoing Message Jika > 10  dipaging 
             if (IsNewOutgoingMessageCome)
             {
-                Thread.Sleep(5000);
+                Thread.Sleep(3000);
                 outgoingMessageService = new OutgoingMessageService();
                 var messages = outgoingMessageService.GetNewOutgoingMessages(); //_context.OutgoingMessages.Where(x => x.sent == null || x.sent == false).ToList();
 
