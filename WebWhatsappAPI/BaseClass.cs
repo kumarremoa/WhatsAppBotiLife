@@ -707,7 +707,7 @@ namespace WebWhatsappAPI
                 {
                     foreach (var div in divLocs)
                     {
-                        var divLocation = driver.FindElement(By.CssSelector("div[class^='_3hy7L selectable-text invisible-space copyable-text']"));
+                        var divLocation = div.FindElement(By.CssSelector("div[class^='_3hy7L selectable-text invisible-space copyable-text']"));
                         var mapUri = divLocation.GetAttribute("data-plain-text");
                         int index = mapUri.IndexOf('?');
                         var query = mapUri.Substring(index + 1)
@@ -735,8 +735,11 @@ namespace WebWhatsappAPI
                                 IGeocoder geocoder = new BingMapsGeocoder("AvDjvEc6XHS7nFnLA8qdgnMcX7NDQX6LbgQfvuwvEaqtfpTZhZwyrp05fmyCu5sC");
                                 var task = geocoder.ReverseGeocodeAsync(lat, lon);
                                 IEnumerable<Address> addresses = task.Result;
-                                var address = addresses.FirstOrDefault();
-                                result.Add("You are On " + address.FormattedAddress);
+                                foreach(var address in addresses)
+                                {
+                                    result.Add("I thought you were on " + address.FormattedAddress);
+                                }                               
+                                
 
                             } catch (Exception ex)
                             {
@@ -765,17 +768,19 @@ namespace WebWhatsappAPI
             try
             {
                 var divImages = driver.FindElements(By.CssSelector("div[class^='_3_7SH _3qMSo message-in'"));
+                var images = driver.FindElements(By.CssSelector("img[class='_1JVSX']"));
+
                 if (divImages.Count > 0)
                 {
                     foreach (var div in divImages)
                     {
                         try
                         {
-                            var Image = driver.FindElement(By.CssSelector("img[class='_1JVSX']"));
+                            var Image = images.LastOrDefault();
                             var uri = Image.GetAttribute("src");
 
                             var incomingMessage = new IncomingMessage();
-                            incomingMessage.messagetext = div.Text;
+                            incomingMessage.messagetext = div.Text + Pname;
                             incomingMessage.created_date = DateTime.Now;
                             incomingMessage.sender = Pname;
 
@@ -785,17 +790,18 @@ namespace WebWhatsappAPI
                                 result.Add(uri);
                                 Dicts.Add(incomingMessage.messagetext + incomingMessage.sender, incomingMessage.messagetext + incomingMessage.sender);
 
+                                var arrlen = (images.Count() - 1);
 
-                                var base64string = ((IJavaScriptExecutor)driver).ExecuteScript(@"
+                                var base64string = ((IJavaScriptExecutor)driver).ExecuteScript(string.Format(@"
                                 var c = document.createElement('canvas');
                                 var ctx = c.getContext('2d');
-                                var img = document.getElementsByClassName('_1JVSX')[0];
+                                var img = document.getElementsByClassName('_1JVSX')[{0}];
                                 c.height=img.height;
                                 c.width=img.width;
                                 ctx.drawImage(img, 0, 0,img.width, img.height);
                                 var base64String = c.toDataURL();
                                 return base64String;
-                                ") as string;
+                                ",arrlen)) as string;
 
                                 var base64 = base64string.Split(',').Last();
                                 string filepath = "";
@@ -1363,7 +1369,7 @@ namespace WebWhatsappAPI
                 Button1.Click();
 
                 WebDriverWait wait2 = new WebDriverWait(driver, TimeSpan.FromSeconds(9));
-                wait2.Until(ExpectedConditions.PresenceOfAllElementsLocatedBy(By.XPath("//*[@id='main']/header/div[3]/div/div[2]/span/div/div/ul/li[1]/button")));
+                wait2.Until(ExpectedConditions.VisibilityOfAllElementsLocatedBy(By.XPath("//*[@id='main']/header/div[3]/div/div[2]/span/div/div/ul/li[1]/button")));
 
                 var Button2 = driver.FindElements(By.XPath("//*[@id='main']/header/div[3]/div/div[2]/span/div/div/ul/li[1]/button"));
                 Button2[0].Click();
