@@ -135,6 +135,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Absent.cs" />
     <Compile Include="BaseClass.cs" />
     <Compile Include="Chrome.cs" />
     <Compile Include="Extensions.cs" />

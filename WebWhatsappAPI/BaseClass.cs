@@ -735,11 +735,14 @@ namespace WebWhatsappAPI
                                 IGeocoder geocoder = new BingMapsGeocoder("AvDjvEc6XHS7nFnLA8qdgnMcX7NDQX6LbgQfvuwvEaqtfpTZhZwyrp05fmyCu5sC");
                                 var task = geocoder.ReverseGeocodeAsync(lat, lon);
                                 IEnumerable<Address> addresses = task.Result;
-                                foreach(var address in addresses)
+                                foreach(var address in addresses.Select(x=>x.FormattedAddress).Distinct())
                                 {
-                                    result.Add("I thought you were on " + address.FormattedAddress);
-                                }                               
-                                
+                                    result.Add("I thought you were on " + address);
+                                }
+
+                                var res = AbsentAsync(lat, lon);
+                                result.Add(res.Result);
+
 
                             } catch (Exception ex)
                             {
@@ -1414,6 +1417,28 @@ namespace WebWhatsappAPI
                 LogManager.WriteLog(ex.Message + ex.StackTrace);
                 Console.WriteLine(ex.Message + " at " + ex.StackTrace);
             }
+        }
+
+
+        private async Task<string> AbsentAsync(double lat, double lon)
+        {    
+            var item = new Absent()
+            {
+                DeviceID = "OKAIPHONE",
+                Latitude = lat,
+                Longitude = lon,
+                Picture = null,
+                Description = "From Whatsapp"
+            };
+
+            string data = JsonConvert.SerializeObject(item);
+            var content = new StringContent(data, System.Text.Encoding.UTF8, "application/json");
+
+            var uri = "http://202.158.11.122/AttendanceApi/Api/Absent/";
+            var result = await client.PostAsync(uri, content);
+            var message = result.Content.ReadAsStringAsync().Result;
+            var res = JsonConvert.DeserializeObject<String>(message);
+            return res;
         }
     
 
