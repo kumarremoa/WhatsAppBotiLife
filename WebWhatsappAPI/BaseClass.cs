@@ -73,7 +73,9 @@ namespace WebWhatsappAPI
         private IDictionary<string, string> emojis = new Dictionary<string, string>();
         private static HttpClient client = new HttpClient();
 
-        private static Dictionary<string, string> Dicts;
+        private static Dictionary<string, string> DictIncomings;
+
+        private static Dictionary<string, string> DictOutgoings;
 
         [DllImport("user32.dll", SetLastError = true)]
         static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
@@ -104,7 +106,7 @@ namespace WebWhatsappAPI
 
         private DateTime tick;
         private EventFiringWebDriver _eventDriver;
-
+        private static readonly object Locker = new object();
         /// <summary>
         /// An event WebDriver from selenium; Selenium.Support package required
         /// </summary>
@@ -329,9 +331,8 @@ namespace WebWhatsappAPI
         {
             //Scan Outgoing Message Jika > 10  dipaging 
             if (IsNewOutgoingMessageCome)
-            {
-                Thread.Sleep(3000);
-                outgoingMessageService = new OutgoingMessageService();
+            {                
+               
                 var messages = outgoingMessageService.GetNewOutgoingMessages(); //_context.OutgoingMessages.Where(x => x.sent == null || x.sent == false).ToList();
 
                 var totalPages = (int)Math.Ceiling((decimal)messages.Count / 10);
@@ -340,32 +341,40 @@ namespace WebWhatsappAPI
                     var ms = messages.Skip(10 * i).Take(10).ToList();
                     foreach (var m in ms)
                     {
-                        Console.WriteLine("Process Send Outgoing Message :" + m.messagetext);
+                        LogManager.WriteLog(i + "." + "Process Send Outgoing Message : " + m.messagetext + " to : " + m.receiver + " at : " + DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss"));
                         SendOutgoingMessage(m);
                     }
                     ScanIncomingMessages();
                 }
 
+                messages = outgoingMessageService.GetNewOutgoingMessages();
                 if (messages.Count == 0)
-                    IsNewOutgoingMessageCome = false;
+                        IsNewOutgoingMessageCome = false;
 
             }
         }
 
         public void SendOutgoingMessage(OutgoingMessage outgoingMessage)
         {
-            if (string.IsNullOrEmpty(outgoingMessage.receiver) || string.IsNullOrEmpty(outgoingMessage.messagetext))
-                return;
-            outgoingMessageService = new OutgoingMessageService();
-            SendMessageNotInContact(outgoingMessage.receiver, outgoingMessage.messagetext);
-            outgoingMessage.sent = true;
-            outgoingMessageService.Update(outgoingMessage);
+            lock (Locker)
+            {
+                if (string.IsNullOrEmpty(outgoingMessage.receiver) || string.IsNullOrEmpty(outgoingMessage.messagetext))
+                    return;
+                outgoingMessageService = new OutgoingMessageService();
+
+                if (outgoingMessageService.IsAlreadySent(outgoingMessage.messageid))
+                    return;
+
+                SendMessageNotInContact(outgoingMessage.receiver, outgoingMessage.messagetext);
+                outgoingMessage.sent = true;
+                outgoingMessageService.Update(outgoingMessage);
+                LogManager.WriteLog("Update Outgoing Message :" + outgoingMessage.messagetext + " to : " + outgoingMessage.receiver + " at : " + DateTime.Now.ToString("dd-MM-yyyy HH:mm:ss"));
 
 
-
+            }
         }
 
-        public void ScanIncomingMessages()
+        private void ScanIncomingMessages()
         {
             //Console.WriteLine("ScanIncomingMessages");
             //Scan Incoming Message 
@@ -426,37 +435,7 @@ namespace WebWhatsappAPI
             }
         }
 
-        /// <summary>
-        /// Checks for messages which enables OnMsgRecieved event
-        /// </summary>
-        /// <returns>Nothing</returns>
-        //public async void MessageScanner()
-        //{
-        //    while (true)
-        //    {
-        //        IReadOnlyCollection<IWebElement> unread = driver.FindElements(By.ClassName("unread-count"));
-        //        if (unread.Count < 1)
-        //        {
-        //            Thread.Sleep(50); //we don't wan't too much overhead
-        //            continue;
-        //        }
-        //        try
-        //        {
-        //            unread.ElementAt(0).Click(); //Goto (first) Unread chat
-        //        }
-        //        catch (Exception)
-        //        {
-        //        } //DEAL with Stale elements
-        //        await Task.Delay(200); //Let it load
-        //        var Pname = "";
-        //        var message_texts = GetLastestText(out Pname);
-        //        foreach (var message_text in message_texts)
-        //        {
-        //            Raise_RecievedMessage(message_text, Pname);
-        //        }
-        //    }
-        //}
-
+    
         /// <summary>
         /// Starts selenium driver, while loading a save file
         /// Note: these functions don't make drivers
@@ -502,24 +481,17 @@ namespace WebWhatsappAPI
             this.driver = driver;
             driver.Navigate().GoToUrl("https://web.whatsapp.com");
             _eventDriver = new EventFiringWebDriver(WebDriver);
-            _context = new Infrastructure.WAModel();
-
-            emojis.Add("Ketawa", ":-d");
-            emojis.Add("Jempol", "(y)");
-            emojis.Add("Senyum", ":-)");
-            emojis.Add("Khawatir", ":-(");
-            emojis.Add("Cinta", "<3");
-
-
+            _context = new WAModel();
+            outgoingMessageService = new OutgoingMessageService();
             CreateDictionaryIncomingMessage();
         }
 
 
         public void CreateDictionaryIncomingMessage()
         {
-            Dicts = new Dictionary<string, string>();
+            DictIncomings = new Dictionary<string, string>();
             var batas = DateTime.Now.AddDays(-2);
-            Dicts = _context.IncomingMessages.AsNoTracking().Where(x => x.created_date >= batas)
+            DictIncomings = _context.IncomingMessages.AsNoTracking().Where(x => x.created_date >= batas)
                 .GroupBy(x => x.messagetext + x.sender)
                 .Select(x => x.Key).ToDictionary(x => x);
         }
@@ -579,7 +551,7 @@ namespace WebWhatsappAPI
         /// </summary>
         /// <param name="Pname">[Optional output] the person that send the message</param>
         /// <returns></returns>
-        public IEnumerable<string> GetLastestText(out string Pname) //TODO: return IList<string> of all unread messages
+        private IEnumerable<string> GetLastestText(out string Pname) //TODO: return IList<string> of all unread messages
         {
             var result = new List<string>();
             Pname = "";
@@ -652,11 +624,11 @@ namespace WebWhatsappAPI
                 incomingMessage.sender = Pname;
 
 
-                if (!Dicts.ContainsKey(incomingMessage.messagetext + incomingMessage.sender))
+                if (!DictIncomings.ContainsKey(incomingMessage.messagetext + incomingMessage.sender))
                 {
                     incomings.Add(incomingMessage);
                     msgs.Add(m);
-                    Dicts.Add(incomingMessage.messagetext + incomingMessage.sender, incomingMessage.messagetext + incomingMessage.sender);
+                    DictIncomings.Add(incomingMessage.messagetext + incomingMessage.sender, incomingMessage.messagetext + incomingMessage.sender);
                 }
 
                 //if (! _context.IncomingMessages.AsNoTracking().Any(x=>x.messagetext.StartsWith(first) && x.messagetext.EndsWith(last) && x.sender == incomingMessage.sender))
@@ -727,7 +699,7 @@ namespace WebWhatsappAPI
                         incomingMessage.sender = Pname;
 
 
-                        if (!Dicts.ContainsKey(incomingMessage.messagetext + incomingMessage.sender))
+                        if (!DictIncomings.ContainsKey(incomingMessage.messagetext + incomingMessage.sender))
                         {
                             incomings.Add(incomingMessage);
                             try
@@ -752,7 +724,7 @@ namespace WebWhatsappAPI
                             }
 
 
-                            Dicts.Add(incomingMessage.messagetext + incomingMessage.sender, incomingMessage.messagetext + incomingMessage.sender);
+                            DictIncomings.Add(incomingMessage.messagetext + incomingMessage.sender, incomingMessage.messagetext + incomingMessage.sender);
                         }
                     }
 
@@ -787,11 +759,11 @@ namespace WebWhatsappAPI
                             incomingMessage.created_date = DateTime.Now;
                             incomingMessage.sender = Pname;
 
-                            if (!Dicts.ContainsKey(incomingMessage.messagetext + incomingMessage.sender))
+                            if (!DictIncomings.ContainsKey(incomingMessage.messagetext + incomingMessage.sender))
                             {
                                 incomings.Add(incomingMessage);
                                 result.Add(uri);
-                                Dicts.Add(incomingMessage.messagetext + incomingMessage.sender, incomingMessage.messagetext + incomingMessage.sender);
+                                DictIncomings.Add(incomingMessage.messagetext + incomingMessage.sender, incomingMessage.messagetext + incomingMessage.sender);
 
                                 var arrlen = (images.Count() - 1);
 
@@ -936,68 +908,15 @@ namespace WebWhatsappAPI
             return text;
         }
 
-        /// <summary>
-        /// Gets Messages from Active/person's conversaton
-        /// <param>Order not garanteed</param>
-        /// </summary>
-        /// <param name="Pname">[Optional input] the person to get messages from</param>
-        /// <returns>Unordered List of messages</returns>
-        public IEnumerable<string> GetMessages(string Pname = null)
-        {
-            if (Pname != null)
-            {
-                SetActivePerson(Pname);
-            }
-            IReadOnlyCollection<IWebElement> messages = null;
-            try
-            {
-                messages = driver.FindElement(By.ClassName("message-list")).FindElements(By.XPath("*"));
-            }
-            catch (Exception ex)
-            {
-                LogManager.WriteLog(ex.Message + ex.StackTrace);
-            } //DEAL with Stale elements
-            foreach (var x in messages)
-            {
-                var message_text_raw = x.FindElement(By.ClassName("selectable-text"));
-                yield return Regex.Replace(message_text_raw.Text, "<!--(.*?)-->", "");
-            }
-        }
 
-        /// <summary>
-        /// Gets messages ordered "newest first"
-        /// </summary>
-        /// <param name="Pname">[Optional input] person to get messages from</param>
-        /// <returns>Ordered List of string's</returns>
-        public List<string> GetMessagesOrdered(string Pname = null)
-        {
-            if (Pname != null)
-            {
-                SetActivePerson(Pname);
-            }
-            IReadOnlyCollection<IWebElement> messages = null;
-            try
-            {
-                messages = driver.FindElement(By.ClassName("message-list")).FindElements(By.XPath("*"));
-            }
-            catch (Exception)
-            {
-            } //DEAL with Stale elements
-            var outp = new List<string>();
-            foreach (var x in messages.OrderBy(x => x.Location.Y).Reverse())
-            {
-                var message_text_raw = x.FindElement(By.ClassName("selectable-text"));
-                outp.Add(Regex.Replace(message_text_raw.Text, "<!--(.*?)-->", ""));
-            }
-            return outp;
-        }
+     
 
         /// <summary>
         /// Send message to person
         /// </summary>
         /// <param name="message">string to send</param>
         /// <param name="person">person to send to (if null send to active)</param>
-        public void SendMessage(string message, string person = null)
+        private void SendMessage(string message, string person = null)
         {
             if (person != null)
             {
@@ -1017,7 +936,7 @@ namespace WebWhatsappAPI
         /// <para>useful for default chat type of situations</para>
         /// </summary>
         /// <param name="person">the person to set active</param>
-        public void SetActivePerson(string person)
+        private void SetActivePerson(string person)
         {
             IReadOnlyCollection<IWebElement> AllChats = driver.FindElements(By.XPath(ALL_CHATS_TITLE_XPATH));
             foreach (var title in AllChats)
@@ -1091,7 +1010,7 @@ namespace WebWhatsappAPI
         /// </summary>
         /// <param name="number"></param>
         /// <param name="message"></param>
-        public void SendMessageNotInContact(string number, string message)
+        private void SendMessageNotInContact(string number, string message)
         {
             try
             {
@@ -1209,7 +1128,7 @@ namespace WebWhatsappAPI
         }
 
 
-        public bool SendMessageSearchInThread(string number, string message)
+        private bool SendMessageSearchInThread(string number, string message)
         {
             var res = false;
             try
@@ -1260,7 +1179,7 @@ namespace WebWhatsappAPI
 
 
 
-        public void SendImage()
+        private void SendImage()
         {
 
             try
@@ -1310,7 +1229,7 @@ namespace WebWhatsappAPI
             }
         }
 
-        public void SendDoc()
+        private void SendDoc()
         {
 
             try
@@ -1361,7 +1280,7 @@ namespace WebWhatsappAPI
         }
 
 
-        public void SendImageFile(string fname)
+        private void SendImageFile(string fname)
         {
 
             try

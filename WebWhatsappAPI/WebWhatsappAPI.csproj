@@ -138,6 +138,7 @@
     <Compile Include="Absent.cs" />
     <Compile Include="BaseClass.cs" />
     <Compile Include="Chrome.cs" />
+    <Compile Include="Emoji.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="Firefox.cs" />
     <Compile Include="Msg.cs" />

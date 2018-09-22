@@ -15,6 +15,7 @@ namespace WebWhatsappAPI.Chrome
             //ChromeOP.AddArgument("user-data-dir=C:\\Users\\Administrator\\AppData\\Local\\Google\\Chrome\\User Data");
             ChromeOP.AddArgument(ConfigurationManager.AppSettings["ProfileDir"]);
             ChromeOP.AddArgument("--mute-audio");
+            ChromeOP.AddArgument("no-sandbox");
             //ChromeOP.AddUserProfilePreference("profile.default_content_setting_values.images", 2);
         }
 

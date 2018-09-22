@@ -67,10 +67,10 @@ namespace WhatsApiLauncher
                 {
                     //lock (Locker)
                     //{
-                        _driver.IsNewOutgoingMessageCome = true;
+                        //_driver.IsNewOutgoingMessageCome = true;
                     //}
                     
-                   // _driver.SendOutgoingMessage(changedEntity);                   
+                    _driver.SendOutgoingMessage(changedEntity);                   
                 }
             }
                 
@@ -131,7 +131,7 @@ namespace WhatsApiLauncher
             
 
             //Timer to fire Check Outgoing Message Coming from DB anticipate SQL Notification Error or Not Work Interval 5 minute
-            System.Timers.Timer t = new System.Timers.Timer(60000 * 5);
+            System.Timers.Timer t = new System.Timers.Timer(60000 * 10);
             t.Elapsed += (sender, e) =>
             {
                 var skrg = DateTime.Now.TimeOfDay;

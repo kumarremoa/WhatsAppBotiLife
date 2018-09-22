@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Linq;
 using System.Text;
 using Infrastructure;
 
@@ -17,6 +18,14 @@ namespace Services
             dataAccess = new DataAccess<OutgoingMessage>(_connectionString);
         }
 
+        public bool IsAlreadySent(long messageid)
+        {
+            var res = dataAccess.GetData("SELECT [messageid],[messagetext],[receiver],[created_date],[sent],[userid],[divison] from [OutgoingMessage] Where messageid=" + messageid);
+            var message = res.FirstOrDefault();
+            return (bool)message.sent;
+
+        }
+
 
         public  void Update(OutgoingMessage outgoingMessage)
         {
@@ -25,7 +34,7 @@ namespace Services
 
         public IList<OutgoingMessage> GetNewOutgoingMessages()
         {
-           var res =   dataAccess.GetData("Select * from OutgoingMessage Where coalesce([sent],0)=0");
+           var res =   dataAccess.GetData("Select [messageid],[messagetext],[receiver],[created_date],[sent],[userid],[divison] from OutgoingMessage Where coalesce([sent],0)=0");
            return res;
 
         }
